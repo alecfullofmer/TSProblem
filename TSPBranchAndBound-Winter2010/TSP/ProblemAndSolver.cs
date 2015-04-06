@@ -7,14 +7,93 @@ using System.Drawing;
 namespace TSP
 {
 
-    
-
-   
-
-    class ProblemAndSolver
+   public class ProblemAndSolver
     {
 
-        public static double bestSoFar;
+       public double bestSoFar;
+
+       public double getBest()
+       {
+           return bestSoFar;
+       }
+
+       public void setBest(double best)
+       {
+           bestSoFar = best;
+       }
+
+       public class State : IComparable
+        {
+            public double[,] matrix;
+            public double bound;
+            public List<int> settledCities;
+
+            public State(double b, List<int> ss, double[,] m)
+            {
+                matrix = m;
+                bound = b;
+                settledCities = ss;
+            }
+
+            public int CompareTo(Object obj)
+            {
+                if (obj == null)
+                    return 1;
+
+                State otherState = (State)obj;
+
+                if (otherState != null)
+                    return this.bound.CompareTo(otherState.bound);
+                else
+                    throw new ArgumentException("YO, this aint a State, B.");
+            }
+
+            public void SetAsBest(double[,] matrix)
+            {
+                double BSSF = 0;
+                for (int i = 1; i < settledCities.Count; i++)
+                {
+                    BSSF += matrix[settledCities[i], settledCities[i - 1]];
+                }
+                BSSF += matrix[0, settledCities[settledCities.Count - 1]];
+
+                if (BSSF < bestSoFar)
+                {
+                    bestSoFar = BSSF;
+                }
+            }
+        }
+   
+
+       public class NeatQueue
+        {
+            public List<State> forReal = new List<State>();
+            public List<State> children = new List<State>();
+
+            public void add(State child)
+            {
+                children.Add(child);
+            }
+
+            public void pushChildren()
+            {
+                foreach (State s in forReal)
+                {
+                    children.Add(s);
+                }
+                forReal = children;
+                children = new List<State>();
+            }
+
+            public State pop()
+            {
+                State s = forReal[0];
+                forReal.RemoveRange(0, 1);
+                return s;
+            }
+        }
+
+        
 
         public State init(double[,] matrix, int size)
         {
@@ -83,79 +162,6 @@ namespace TSP
             bestSoFar += matrix[0, visted[Route.Count]];
         }
 
-        class NeatQueue
-        {
-            public List<State> fourReal;
-            public List<State> children;
-
-            public void add(State child)
-            {
-                children.Add(child);
-            }
-
-            public void pushChildren()
-            {
-                foreach (State s in fourReal)
-                {
-                    children.Add(s);
-                }
-                fourReal = children;
-                children = new List<State>();
-            }
-
-            public State pop()
-            {
-                State s = fourReal[0];
-                fourReal.RemoveRange(0, 1);
-                return s;
-            }
-
-
-        }
-
-        class State : IComparable
-        {
-            public double[,] matrix;
-            public double bound;
-            public List<int> settledCities;
-
-
-
-            public State(double b, List<int> ss, double[,] m)
-            {
-                matrix = m;
-                bound = b;
-                settledCities = ss;
-            }
-
-            public int CompareTo(Object obj)
-            {
-                if (obj == null)
-                    return 1;
-
-                State otherState = (State)obj;
-
-                if (otherState != null)
-                    return this.bound.CompareTo(otherState.bound);
-                else
-                    throw new ArgumentException("YO, this aint a State, B.");
-            }
-
-            public void SetAsBest(double[,] matrix)
-            {
-                double BSSF = 0;
-                for (int i = 1; i < settledCities.Count; i++)
-                {
-                    BSSF += matrix[settledCities[i], settledCities[i - 1]];
-                }
-                BSSF += matrix[0, settledCities[settledCities.Count - 1]];
-
-                if (BSSF < bestSoFar)
-                {
-                    bestSoFar = BSSF;
-                }
-            }
-        }
 
         public List<State> getChildren(State current)
         {
@@ -487,7 +493,7 @@ namespace TSP
             NeatQueue agenda = new NeatQueue();
             agenda.add(initial);
 
-            while (agenda.fourReal.Count > 0)
+            while (agenda.forReal.Count > 0)
             {
                 State workingState = agenda.pop();
                 List<State> children = getChildren(workingState);
@@ -503,7 +509,7 @@ namespace TSP
 
             }
 
-            Program.MainForm.tbCostOfTour.Text = " " + bssf.costOfRoute();
+            Program.MainForm.tbCostOfTour.Text = " " + bestSoFar;
             // do a refresh. 
             Program.MainForm.Invalidate();
         }
