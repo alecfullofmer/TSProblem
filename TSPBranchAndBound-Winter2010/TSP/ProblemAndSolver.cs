@@ -10,204 +10,6 @@ namespace TSP
    public class ProblemAndSolver
     {
 
-       public double bestSoFar;
-
-       public double getBest()
-       {
-           return bestSoFar;
-       }
-
-       public void setBest(double best)
-       {
-           bestSoFar = best;
-       }
-
-       public class State : IComparable
-        {
-            public double[,] matrix;
-            public double bound;
-            public List<int> settledCities;
-
-            public State(double b, List<int> ss, double[,] m)
-            {
-                matrix = m;
-                bound = b;
-                settledCities = ss;
-            }
-
-            public int CompareTo(Object obj)
-            {
-                if (obj == null)
-                    return 1;
-
-                State otherState = (State)obj;
-
-                if (otherState != null)
-                    return this.bound.CompareTo(otherState.bound);
-                else
-                    throw new ArgumentException("YO, this aint a State, B.");
-            }
-
-            public void SetAsBest(double[,] matrix)
-            {
-                double BSSF = 0;
-                for (int i = 1; i < settledCities.Count; i++)
-                {
-                    BSSF += matrix[settledCities[i], settledCities[i - 1]];
-                }
-                BSSF += matrix[0, settledCities[settledCities.Count - 1]];
-
-                if (BSSF < bestSoFar)
-                {
-                    bestSoFar = BSSF;
-                }
-            }
-        }
-   
-
-       public class NeatQueue
-        {
-            public List<State> forReal = new List<State>();
-            public List<State> children = new List<State>();
-
-            public void add(State child)
-            {
-                children.Add(child);
-            }
-
-            public void pushChildren()
-            {
-                foreach (State s in forReal)
-                {
-                    children.Add(s);
-                }
-                forReal = children;
-                children = new List<State>();
-            }
-
-            public State pop()
-            {
-                State s = forReal[0];
-                forReal.RemoveRange(0, 1);
-                return s;
-            }
-        }
-
-        
-
-        public State init(double[,] matrix, int size)
-        {
-            double totalLowerBound = 0;
-            for (int i = 0; i < size; i++)
-            {
-                double min = Double.PositiveInfinity;
-                for (int j = 0; j < size; j++)
-                {
-                    if (matrix[i, j] < min)
-                    {
-                        min = matrix[i, j];
-                    }
-                }
-                for (int j = 0; j < size; j++)
-                {
-                    matrix[i, j] -= min;
-                }
-                totalLowerBound += min;
-            }
-
-            for (int i = 0; i < size; i++)
-            {
-                double min = Double.PositiveInfinity;
-                for (int j = 0; j < size; j++)
-                {
-                    if (matrix[j, i] < min)
-                    {
-                        min = matrix[j, i];
-                    }
-                }
-                for (int j = 0; j < size; j++)
-                {
-                    matrix[j, i] -= min;
-                }
-                totalLowerBound += min;
-            }
-
-            State state = new State(totalLowerBound, new List<int>(), matrix);
-            return state;
-        }
-
-        public void initBSSF(double[,] matrix)
-        {
-            bestSoFar = 0;
-            List<int> visted = new List<int>();
-            int next = 0;
-            visted.Add(next);
-            while (visted.Count < Route.Count)
-            {
-                double min = Double.PositiveInfinity;
-                int tempNext = -1;
-                for (int j = 0; j < Route.Count; j++)
-                {
-                    if (matrix[next, j] < min && !visted.Contains(j))
-                    {
-                        min = matrix[next, j];
-                        tempNext = j;
-
-                    }
-
-                }
-                bestSoFar += min;
-            }
-
-            bestSoFar += matrix[0, visted[Route.Count]];
-        }
-
-
-        public List<State> getChildren(State current)
-        {
-            List<State> children = new List<State>();
-            int lastVisted = current.settledCities[current.settledCities.Count - 1];
-            for (int i = 0; i < Route.Count; i++)
-            {
-                if (!current.settledCities.Contains(i))
-                {
-                    if (bestSoFar > current.bound + current.matrix[i, lastVisted])
-                    {
-                        double child_lb = current.bound + current.matrix[i, lastVisted];
-                        List<int> settled = current.settledCities;
-                        settled.Add(i);
-                        double[,] childMatrix = current.matrix;
-                        for (int j = 0; j < Route.Count; j++)
-                        {
-                            childMatrix[i, j] = Double.PositiveInfinity;
-                            childMatrix[j, lastVisted] = Double.PositiveInfinity;
-                        }
-                        children.Add(new State(child_lb, settled, childMatrix));
-                    }
-                }
-            }
-
-            children.Sort();
-            return children;
-        }
-
-        public bool MeetsCriterion(State child)
-        {
-            if (child.settledCities.Count < Route.Count)
-                return false;
-
-            List<int> sortedSettled = child.settledCities;
-            sortedSettled.Sort();
-
-            for (int i = 0; i < Route.Count; i++)
-            {
-                if (i != sortedSettled[i])
-                    return false;
-            }
-
-            return true;
-        }
-
         private class TSPSolution
         {
 
@@ -280,7 +82,13 @@ namespace TSP
         /// <summary>
         /// best solution so far. 
         /// </summary>
-        private TSPSolution bssf; 
+        private TSPSolution bssf;
+
+        private double bestSoFar;
+
+       private double solutionTime;
+
+       System.Diagnostics.Stopwatch timer;
 
         /// <summary>
         /// how to color various things. 
@@ -457,9 +265,14 @@ namespace TSP
         /// </summary>
         public void solveProblem()
         {
-            int x;
-            Route = new ArrayList(); 
+            timer = new System.Diagnostics.Stopwatch();
+            bool timeUp = false;
+            timer.Start();
+            /*
             // this is the trivial solution. 
+            int x;
+            Route = new ArrayList();
+            
             for (x = 0; x < Cities.Length; x++)
             {
                 Route.Add( Cities[Cities.Length - x -1]);
@@ -467,51 +280,273 @@ namespace TSP
             // call this the best solution so far.  bssf is the route that will be drawn by the Draw method. 
             bssf = new TSPSolution(Route);
             // update the cost of the tour.
+             */
 
-            int size = Route.Count;
-            double[,] distance_matrix = new double[size, size];
+            
+            double[,] distance_matrix = new double[_size, _size];
 
-            for (int i = 0; i < size; i++)
+            for (int i = 0; i < _size; i++)
             {
-                for (int j = i; j < size; j++)
+                for (int j = i; j < _size; j++)
                 {
-                    if (j == 1)
+                    if (j == i)
                     {
                         distance_matrix[j, j] = Double.PositiveInfinity;
                     }
                     else
                     {
-                        City here = Route[i] as City;
-                        City there = Route[j] as City;
+                        City here = Cities[i] as City;
+                        City there = Cities[j] as City;
                         distance_matrix[i, j] = distance_matrix[j, i] = here.costToGetTo(there);
 
                     }
                 }
             }
 
-            State initial = init(distance_matrix, size);
+            initBSSF(distance_matrix);
+            State initial = init(distance_matrix, _size);
             NeatQueue agenda = new NeatQueue();
             agenda.add(initial);
-
-            while (agenda.forReal.Count > 0)
+            agenda.pushChildren();
+            while (agenda.getUpToDateQueue().Count > 0)
             {
                 State workingState = agenda.pop();
-                List<State> children = getChildren(workingState);
-                foreach(State child in children)
+                if (workingState.bound < bestSoFar)
                 {
-                    if (MeetsCriterion(child))
+                    List<State> children = getChildren(workingState);
+                    foreach (State child in children)
                     {
-                        child.SetAsBest(distance_matrix);
+                        if (timer.Elapsed.Minutes > 0)
+                        {
+                            timer.Stop();
+                            timeUp = true;
+                            break;
+                        }
+                        else if (MeetsCriterion(child))
+                        {
+                            setBSSF(child);
+                        }
+                        else
+                            agenda.add(child);
                     }
-                    else
-                        agenda.add(child);
+                    agenda.pushChildren();
                 }
-
+                if (timeUp)
+                {
+                    break;
+                }
+                    
             }
 
             Program.MainForm.tbCostOfTour.Text = " " + bestSoFar;
+            Program.MainForm.tbElapsedTime.Text = " " + solutionTime;
             // do a refresh. 
             Program.MainForm.Invalidate();
+        }
+
+        private class State : IComparable
+        {
+            public double[,] matrix;
+            public double bound;
+            public List<int> settledCities;
+
+            public State(double b, List<int> ss, double[,] m)
+            {
+                matrix = m;
+                bound = b;
+                settledCities = ss;
+            }
+
+            public int CompareTo(Object obj)
+            {
+                if (obj == null)
+                    return 1;
+
+                State otherState = (State)obj;
+
+                if (otherState != null)
+                    return this.bound.CompareTo(otherState.bound);
+                else
+                    throw new ArgumentException("YO, this aint a State, B.");
+            }
+                
+        }
+
+        private void setBSSF(State child)
+        {
+            double tempTime = timer.Elapsed.Seconds;
+            ArrayList cities = new ArrayList();
+            for (int j = 0; j < _size; ++j)
+            {
+                cities.Add(Cities[child.settledCities[j]]);
+            }
+            TSPSolution newRoute = new TSPSolution(cities);
+            if (newRoute.costOfRoute() < bestSoFar)
+            {
+                bssf = newRoute;
+                bestSoFar = newRoute.costOfRoute();
+                solutionTime = tempTime;
+            }
+            
+        }
+        private class NeatQueue
+        {
+            private List<State> forReal = new List<State>();
+            private List<State> children = new List<State>();
+
+            public List<State> getUpToDateQueue()
+            {
+                return forReal;
+            }
+
+            public void add(State child)
+            {
+                children.Add(child);
+            }
+
+            public void pushChildren()
+            {
+                foreach (State s in forReal)
+                {
+                    children.Add(s);
+                }
+                forReal = children;
+                children = new List<State>();
+            }
+
+            public State pop()
+            {
+                State s = forReal[0];
+                forReal.RemoveRange(0, 1);
+                return s;
+            }
+        }
+
+
+
+        private State init(double[,] matrix, int size)
+        {
+            double totalLowerBound = 0;
+            for (int i = 0; i < size; i++)
+            {
+                double min = Double.PositiveInfinity;
+                for (int j = 0; j < size; j++)
+                {
+                    if (matrix[i, j] < min)
+                    {
+                        min = matrix[i, j];
+                    }
+                }
+                for (int j = 0; j < size; j++)
+                {
+                    matrix[i, j] -= min;
+                }
+                totalLowerBound += min;
+            }
+
+            for (int i = 0; i < size; i++)
+            {
+                double min = Double.PositiveInfinity;
+                for (int j = 0; j < size; j++)
+                {
+                    if (matrix[j, i] < min)
+                    {
+                        min = matrix[j, i];
+                    }
+                }
+                for (int j = 0; j < size; j++)
+                {
+                    matrix[j, i] -= min;
+                }
+                totalLowerBound += min;
+            }
+
+            State state = new State(totalLowerBound, new List<int>(), matrix);
+            return state;
+        }
+
+        private void initBSSF(double[,] matrix)
+        {
+            bestSoFar = 0;
+            List<int> visited = new List<int>();
+            ArrayList cities = new ArrayList();
+            int next = 0;
+            visited.Add(next);
+            cities.Add(Cities[next]);
+            while (visited.Count < _size)
+            {
+                double min = Double.PositiveInfinity;
+                int tempNext = -1;
+                for (int j = 0; j < _size; j++)
+                {
+                    if (matrix[next, j] < min && !visited.Contains(j))
+                    {
+                        min = matrix[next, j];
+                        tempNext = j;
+                    }
+
+                }
+                next = tempNext;
+                visited.Add(next);
+                cities.Add(Cities[next]);
+                bestSoFar += min;
+            }
+
+            bestSoFar += matrix[0, visited[_size -1]];
+            bssf = new TSPSolution(cities);
+            solutionTime = timer.Elapsed.Seconds;
+
+        }
+
+
+        private List<State> getChildren(State current)
+        {
+            List<State> children = new List<State>();
+            int lastVisited = -1;
+            if (current.settledCities.Count > 0) 
+                lastVisited = current.settledCities[current.settledCities.Count - 1];
+            for (int i = 0; i < Cities.Length; i++)
+            {
+                if (!current.settledCities.Contains(i))
+                {
+                    double child_lb = current.bound;
+                    if (lastVisited != -1)
+                        child_lb += current.matrix[i, lastVisited];
+                    if (bestSoFar > child_lb)
+                    {
+                        List<int> settled = new List<int>(current.settledCities);
+                        settled.Add(i);
+                        double[,] childMatrix = (double[,])current.matrix.Clone();
+                        for (int j = 0; j < _size; j++)
+                        {
+                            childMatrix[i, j] = Double.PositiveInfinity;
+                            if(lastVisited != -1)
+                                childMatrix[j, lastVisited] = Double.PositiveInfinity;
+                        }
+                        children.Add(new State(child_lb, settled, childMatrix));
+                    }
+                }
+            }
+
+            children.Sort();
+            return children;
+        }
+
+        private bool MeetsCriterion(State child)
+        {
+            if (child.settledCities.Count < _size)
+                return false;
+
+            List<int> sortedSettled = new List<int> (child.settledCities);
+            sortedSettled.Sort();
+
+            for (int i = 0; i <_size; i++)
+            {
+                if (i != sortedSettled[i])
+                    return false;
+            }
+
+            return true;
         }
         #endregion
     }
